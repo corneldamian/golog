@@ -16,10 +16,20 @@ package main
 import (
     "github.com/corneldamian/golog"
     "fmt"
+    "io"
    )
 
 func main() {
     log := golog.NewLogger("log", "logfile", 10*1024*1024, 0)
+    log.Level = golog.DEBUG
+    log.Verbosity = golog.LDefault | golog.LHeaderFooter | golog.LFile
+    
+    //LHeaderFooter will write a create and close date tag using default writers
+    //if you want you can overwrite them using log.HeaderWriter and log.FooterWriter
+    log.HeaderWriter = func(w io.Writer) {
+        fmt.Fprint(w, "#End tag")
+    }
+    
     log.Info("Test %s", "Today")
     
     //if you need a go standard logger for some libs you can use GetGoLogger

@@ -85,14 +85,14 @@ func (l *logmanager) formatHeader(buf *[]byte, msg *message) {
 	}
 
 	if msg.vebosity&LLevel != 0 {
-		*buf = append(*buf, '[')
 		*buf = append(*buf, msg.level.String()...)
-		*buf = append(*buf, "] "...)
+		*buf = append(*buf, ' ')
 	}
 
 	if msg.vebosity&LFile != 0 {
+		*buf = append(*buf, '[')
 		*buf = append(*buf, msg.callLocation...)
-		*buf = append(*buf, ' ')
+		*buf = append(*buf, "] "...)
 	}
 
 	if len(msg.message) > 1 {
