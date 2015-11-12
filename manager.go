@@ -95,6 +95,13 @@ func (l *logmanager) formatHeader(buf *[]byte, msg *message) {
 		*buf = append(*buf, "] "...)
 	}
 
+	if msg.prefix != nil && *msg.prefix != ""{
+		*buf = append(*buf, '[')
+		*buf = append(*buf, *msg.prefix...)
+		*buf = append(*buf, "] "...)
+	}
+
+
 	if len(msg.message) > 1 {
 		*buf = append(*buf, fmt.Sprintf(msg.message[0].(string), msg.message[1:]...)...)
 	} else {

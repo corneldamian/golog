@@ -69,6 +69,8 @@ type Logger struct {
 	Level        LogLevel
 	Verbosity    LogVerbosity
 	GoLogLevel   LogLevel
+	Prefix string
+	FileDepth int
 	HeaderWriter func(io.Writer)
 	FooterWriter func(io.Writer)
 
@@ -122,6 +124,8 @@ func NewLogger(name, filepath string, fileRotateSize, queueSize int) *Logger {
 		Level:        INFO,
 		Verbosity:    LDefault,
 		GoLogLevel:   INFO,
+		Prefix: "",
+		FileDepth: 2,
 		HeaderWriter: defaultHeaderWriter,
 		FooterWriter: defaultFooterWriter,
 
@@ -148,7 +152,7 @@ func (l *Logger) Debug(v ...interface{}) {
 		return
 	}
 
-	l.manager.C <- l.createMessage(2, DEBUG, v...)
+	l.manager.C <- l.createMessage(l.FileDepth, DEBUG, v...)
 }
 
 func (l *Logger) Info(v ...interface{}) {
@@ -156,7 +160,7 @@ func (l *Logger) Info(v ...interface{}) {
 		return
 	}
 
-	l.manager.C <- l.createMessage(2, INFO, v...)
+	l.manager.C <- l.createMessage(l.FileDepth, INFO, v...)
 }
 
 func (l *Logger) Warning(v ...interface{}) {
@@ -164,7 +168,7 @@ func (l *Logger) Warning(v ...interface{}) {
 		return
 	}
 
-	l.manager.C <- l.createMessage(2, WARNING, v...)
+	l.manager.C <- l.createMessage(l.FileDepth, WARNING, v...)
 }
 
 func (l *Logger) Error(v ...interface{}) {
@@ -172,7 +176,27 @@ func (l *Logger) Error(v ...interface{}) {
 		return
 	}
 
-	l.manager.C <- l.createMessage(2, ERROR, v...)
+	l.manager.C <- l.createMessage(l.FileDepth, ERROR, v...)
+}
+
+//create another logger that will add a prefix
+func (l *Logger) WithPrefix(prefix string) *Logger{
+	return &Logger{
+		Level:        l.Level,
+		Verbosity:    l.Verbosity,
+		GoLogLevel:   l.GoLogLevel,
+		Prefix: prefix,
+		HeaderWriter: l.HeaderWriter,
+		FooterWriter: l.FooterWriter,
+		FileDepth: l.FileDepth,
+
+		manager: l.manager,
+	}
+}
+
+//set the depth of the file/line log (this is if you want to create wrapper over it)
+func (l *Logger) SetFileDepth(depth int) {
+	l.FileDepth = depth
 }
 
 func (l *Logger) Write(p []byte) (n int, err error) {
@@ -180,7 +204,7 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 		return
 	}
 
-	l.manager.C <- l.createMessage(4, l.GoLogLevel, string(p[0:len(p)-1]))
+	l.manager.C <- l.createMessage(l.FileDepth + 2, l.GoLogLevel, string(p[0:len(p)-1]))
 
 	return len(p), nil
 }
@@ -200,6 +224,7 @@ func (l *Logger) createMessage(calldepth int, level LogLevel, v ...interface{}) 
 	msg.message = v
 	msg.level = level
 	msg.vebosity = l.Verbosity
+	msg.prefix = &l.Prefix
 
 	if l.Verbosity&LFile != 0 {
 		_, file, line, ok := runtime.Caller(calldepth)
@@ -226,6 +251,7 @@ func (l *Logger) createMessage(calldepth int, level LogLevel, v ...interface{}) 
 }
 
 type message struct {
+	prefix *string
 	date         time.Time
 	level        LogLevel
 	vebosity     LogVerbosity
