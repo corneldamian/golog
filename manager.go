@@ -7,8 +7,7 @@ import (
 	"time"
 )
 
-//default queue size
-const LOGQUEUE = 50000
+//how much to write in stderr before retry to write in file
 const tempStderrWriteSize = 500 * 1024
 
 func newManager(fileName string, config *LoggerConfig) *logmanager {
