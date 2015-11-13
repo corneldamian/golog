@@ -20,9 +20,12 @@ import (
    )
 
 func main() {
-    log := golog.NewLogger("log", "logfile", 10*1024*1024, 0)
-    log.Level = golog.DEBUG
-    log.Verbosity = golog.LDefault | golog.LHeaderFooter | golog.LFile
+    logconf := &golog.LoggerConfig{
+        Level:     golog.DEBUG,
+        Verbosity: golog.LDefault | golog.LHeaderFooter | golog.LFile,
+    }
+
+    log := golog.NewLogger("log", "logfile", logconf)
     
     //LHeaderFooter will write a create and close date tag using default writers
     //if you want you can overwrite them using log.HeaderWriter and log.FooterWriter
