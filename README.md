@@ -21,7 +21,7 @@ import (
 
 func main() {
     logconf := &golog.LoggerConfig{
-        Level:     golog.DEBUG,
+        Level:     ToLogLevel("DEBUG"),
         Verbosity: golog.LDefault | golog.LHeaderFooter | golog.LFile,
     }
 

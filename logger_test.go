@@ -7,7 +7,7 @@ import (
 
 func TestLogger(t *testing.T) {
 	l := NewLogger("test1", "test1", &LoggerConfig{
-		Level:     DEBUG,
+		Level:     ToLogLevel("DEBUG"),
 		Verbosity: LDefault | LHeaderFooter | LFile,
 	})
 

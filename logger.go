@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+	"strings"
 )
 
 type LogLevel int
@@ -26,6 +27,7 @@ const (
 	lunknown = "UNKNOWN"
 )
 
+//LogLevel to string
 func (ll LogLevel) String() string {
 	switch ll {
 	case ERROR:
@@ -39,6 +41,24 @@ func (ll LogLevel) String() string {
 	}
 
 	return lunknown
+}
+
+//string to LogLevel (if unknown will return INFO)
+func ToLogLevel(loglevel string) LogLevel {
+	loglevel = strings.ToLower(loglevel)
+
+	switch loglevel {
+	case lerror:
+		return ERROR
+	case lwarning:
+		return WARNING
+	case linfo:
+		return INFO
+	case ldebug:
+		return DEBUG
+	}
+
+	return INFO
 }
 
 type LogVerbosity int
@@ -205,6 +225,51 @@ func (l *Logger) Error(v ...interface{}) {
 	l.manager.C <- l.createMessage(l.fileDepth, ERROR, v...)
 }
 
+func (l *Logger) Debugf(fmt string, v ...interface{}) {
+	if l.level < DEBUG {
+		return
+	}
+
+	v = append(v, v[0])
+	v[0] = fmt
+
+	l.manager.C <- l.createMessage(l.fileDepth + 1, DEBUG, v...)
+}
+
+func (l *Logger) Infof(fmt string, v ...interface{}) {
+	if l.level < INFO {
+		return
+	}
+
+	v = append(v, v[0])
+	v[0] = fmt
+
+	l.manager.C <- l.createMessage(l.fileDepth + 1, INFO, v...)
+}
+
+func (l *Logger) Warningf(fmt string, v ...interface{}) {
+	if l.level < WARNING {
+		return
+	}
+
+	v = append(v, v[0])
+	v[0] = fmt
+
+	l.manager.C <- l.createMessage(l.fileDepth + 1, WARNING, v...)
+}
+
+func (l *Logger) Errorf(fmt string, v ...interface{}) {
+	if l.level < ERROR {
+		return
+	}
+
+	v = append(v, v[0])
+	v[0] = fmt
+
+	l.manager.C <- l.createMessage(l.fileDepth + 1, ERROR, v...)
+}
+
+
 func (l *Logger) Write(p []byte) (n int, err error) {
 	if l.level < l.goLogLevel {
 		return
@@ -214,6 +279,7 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 
 	return len(p), nil
 }
+
 
 func (l *Logger) GetGoLogger() *log.Logger {
 	if l.gologger == nil {
