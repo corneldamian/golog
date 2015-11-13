@@ -11,19 +11,15 @@ import (
 const LOGQUEUE = 50000
 const tempStderrWriteSize = 500 * 1024
 
-func newManager(filepath string, fileRotateSize, queueSize int) *logmanager {
-	if queueSize == 0 {
-		queueSize = LOGQUEUE
-	}
-
+func newManager(fileName string, config *LoggerConfig) *logmanager {
 	manage := &logmanager{
-		C:                     make(chan *message, queueSize),
-		filepath:              filepath,
-		fileRotateSize:        fileRotateSize,
-		initialFileRotateSize: fileRotateSize,
+		C:              make(chan *message, config.MessageQueueSize),
+		fileName:       fileName,
+		fileRotateSize: config.FileRotateSize,
+		config:         config,
 	}
 
-	go manage.start()
+	manage.start()
 
 	return manage
 }
@@ -31,12 +27,11 @@ func newManager(filepath string, fileRotateSize, queueSize int) *logmanager {
 type logmanager struct {
 	C chan *message
 
-	logger                *Logger
-	filepath              string
-	fileRotateSize        int
-	initialFileRotateSize int
-	currentFileSize       int
-	currentFile           io.Writer
+	config          *LoggerConfig
+	fileName        string
+	fileRotateSize  int
+	currentFileSize int
+	currentFile     io.Writer
 }
 
 func (l *logmanager) start() {
@@ -55,12 +50,12 @@ func (l *logmanager) start() {
 }
 
 func (l *logmanager) formatHeader(buf *[]byte, msg *message) {
-	if msg.vebosity&LUTC != 0 {
+	if l.config.Verbosity&LUTC != 0 {
 		msg.date = msg.date.UTC()
 	}
 
-	if msg.vebosity&(LDate|LTime|LMicroseconds) != 0 {
-		if msg.vebosity&LDate != 0 {
+	if l.config.Verbosity&(LDate|LTime|LMicroseconds) != 0 {
+		if l.config.Verbosity&LDate != 0 {
 			year, month, day := msg.date.Date()
 			itoa(buf, year, 4)
 			*buf = append(*buf, '/')
@@ -69,14 +64,14 @@ func (l *logmanager) formatHeader(buf *[]byte, msg *message) {
 			itoa(buf, day, 2)
 			*buf = append(*buf, ' ')
 		}
-		if msg.vebosity&(LTime|LMicroseconds) != 0 {
+		if l.config.Verbosity&(LTime|LMicroseconds) != 0 {
 			hour, min, sec := msg.date.Clock()
 			itoa(buf, hour, 2)
 			*buf = append(*buf, ':')
 			itoa(buf, min, 2)
 			*buf = append(*buf, ':')
 			itoa(buf, sec, 2)
-			if msg.vebosity&LMicroseconds != 0 {
+			if l.config.Verbosity&LMicroseconds != 0 {
 				*buf = append(*buf, '.')
 				itoa(buf, msg.date.Nanosecond()/1e3, 6)
 			}
@@ -84,23 +79,22 @@ func (l *logmanager) formatHeader(buf *[]byte, msg *message) {
 		}
 	}
 
-	if msg.vebosity&LLevel != 0 {
+	if l.config.Verbosity&LLevel != 0 {
 		*buf = append(*buf, msg.level.String()...)
 		*buf = append(*buf, ' ')
 	}
 
-	if msg.vebosity&LFile != 0 {
+	if l.config.Verbosity&LFile != 0 {
 		*buf = append(*buf, '[')
 		*buf = append(*buf, msg.callLocation...)
 		*buf = append(*buf, "] "...)
 	}
 
-	if msg.prefix != nil && *msg.prefix != ""{
+	if l.config.Prefix != "" {
 		*buf = append(*buf, '[')
-		*buf = append(*buf, *msg.prefix...)
+		*buf = append(*buf, l.config.Prefix...)
 		*buf = append(*buf, "] "...)
 	}
-
 
 	if len(msg.message) > 1 {
 		*buf = append(*buf, fmt.Sprintf(msg.message[0].(string), msg.message[1:]...)...)
@@ -135,20 +129,22 @@ func (l *logmanager) closeFile() {
 	if l.currentFile != nil && l.currentFile != os.Stderr {
 		fc := l.currentFile.(*os.File)
 
-		if l.logger.Verbosity&LHeaderFooter != 0 {
-			l.logger.FooterWriter(fc)
+		if l.config.Verbosity&LHeaderFooter != 0 {
+			l.config.FooterWriter(fc)
 		}
+
+		fc.Close()
 	}
 }
 
 func (l *logmanager) newFile() {
-	file := l.filepath + ".log"
+	file := l.fileName + ".log"
 	l.currentFileSize = 0
 
 	if l.currentFile != os.Stderr {
 		if err := l.rename(file); err != nil {
 			if err == os.ErrExist {
-				l.fileRotateSize += l.initialFileRotateSize / 20
+				l.fileRotateSize += l.config.FileRotateSize / 20
 				return
 			}
 			l.currentFile = os.Stderr
@@ -163,11 +159,11 @@ func (l *logmanager) newFile() {
 		return
 	}
 
-	if l.logger.Verbosity&LHeaderFooter != 0 {
-		l.logger.HeaderWriter(ff)
+	if l.config.Verbosity&LHeaderFooter != 0 {
+		l.config.HeaderWriter(ff)
 	}
 
-	l.fileRotateSize = l.initialFileRotateSize
+	l.fileRotateSize = l.config.FileRotateSize
 	l.currentFile = ff
 }
 
@@ -181,11 +177,11 @@ func (l *logmanager) rename(file string) error {
 		}
 
 		t := time.Now()
-		if l.logger.Verbosity&LUTC != 0 {
+		if l.config.Verbosity&LUTC != 0 {
 			t = t.UTC()
 		}
 
-		renameToFile = fmt.Sprintf("%s-%s.log", l.filepath, t.Format("01-02-2006_15-04-05"))
+		renameToFile = fmt.Sprintf("%s-%s.log", l.fileName, t.Format("01-02-2006_15-04-05"))
 
 		_, err := os.Stat(renameToFile)
 		if err == nil {

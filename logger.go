@@ -66,13 +66,10 @@ var defaultFooterWriter = func(w io.Writer) {
 }
 
 type Logger struct {
-	Level        LogLevel
-	Verbosity    LogVerbosity
-	GoLogLevel   LogLevel
-	Prefix string
-	FileDepth int
-	HeaderWriter func(io.Writer)
-	FooterWriter func(io.Writer)
+	level      LogLevel
+	verbosity  LogVerbosity
+	goLogLevel LogLevel
+	fileDepth  int
 
 	manager  *logmanager
 	gologger *log.Logger
@@ -114,97 +111,106 @@ func Stop(timeout time.Duration) error {
 	}
 }
 
+type LoggerConfig struct {
+	FileRotateSize   int // default 16MB
+	MessageQueueSize int
+	Level            LogLevel
+	Verbosity        LogVerbosity
+	GoLogLevel       LogLevel
+	Prefix           string
+	FileDepth        int
+	HeaderWriter     func(io.Writer)
+	FooterWriter     func(io.Writer)
+}
+
 //will create a new logger instance (not go routine safe)
-func NewLogger(name, filepath string, fileRotateSize, queueSize int) *Logger {
-	if _, found := registeredLoggers[name]; found {
-		panic("Logger " + name + " already registered")
+func NewLogger(loggerName, fileName string, config *LoggerConfig) *Logger {
+	if _, found := registeredLoggers[loggerName]; found {
+		panic("Logger " + loggerName + " already registered")
+	}
+
+	if config == nil {
+		config = &LoggerConfig{
+			FileRotateSize:   (2 << 23), /*16MB*/
+			MessageQueueSize: 50000,
+			Level:            INFO,
+			Verbosity:        LDefault,
+			GoLogLevel:       INFO,
+			Prefix:           "",
+			FileDepth:        2,
+			HeaderWriter:     defaultHeaderWriter,
+			FooterWriter:     defaultFooterWriter,
+		}
+	} else {
+		if config.HeaderWriter == nil {
+			config.HeaderWriter = defaultHeaderWriter
+		}
+
+		if config.FooterWriter == nil {
+			config.FooterWriter = defaultFooterWriter
+		}
 	}
 
 	l := &Logger{
-		Level:        INFO,
-		Verbosity:    LDefault,
-		GoLogLevel:   INFO,
-		Prefix: "",
-		FileDepth: 2,
-		HeaderWriter: defaultHeaderWriter,
-		FooterWriter: defaultFooterWriter,
-
-		manager: newManager(filepath, fileRotateSize, queueSize),
+		level:      config.Level,
+		verbosity:  config.Verbosity,
+		goLogLevel: config.GoLogLevel,
+		fileDepth:  config.FileDepth,
+		manager:    newManager(fileName, config),
 	}
-	l.manager.logger = l
 
-	registeredLoggers[name] = l
+	registeredLoggers[loggerName] = l
 
 	return l
 }
 
 //get an existing logger
-func GetLogger(name string) *Logger {
-	if logger, found := registeredLoggers[name]; found {
+func GetLogger(loggerName string) *Logger {
+	if logger, found := registeredLoggers[loggerName]; found {
 		return logger
 	}
 
-	panic("Logger " + name + " not registered")
+	panic("Logger " + loggerName + " not registered")
 }
 
 func (l *Logger) Debug(v ...interface{}) {
-	if l.Level < DEBUG {
+	if l.level < DEBUG {
 		return
 	}
 
-	l.manager.C <- l.createMessage(l.FileDepth, DEBUG, v...)
+	l.manager.C <- l.createMessage(l.fileDepth, DEBUG, v...)
 }
 
 func (l *Logger) Info(v ...interface{}) {
-	if l.Level < INFO {
+	if l.level < INFO {
 		return
 	}
 
-	l.manager.C <- l.createMessage(l.FileDepth, INFO, v...)
+	l.manager.C <- l.createMessage(l.fileDepth, INFO, v...)
 }
 
 func (l *Logger) Warning(v ...interface{}) {
-	if l.Level < WARNING {
+	if l.level < WARNING {
 		return
 	}
 
-	l.manager.C <- l.createMessage(l.FileDepth, WARNING, v...)
+	l.manager.C <- l.createMessage(l.fileDepth, WARNING, v...)
 }
 
 func (l *Logger) Error(v ...interface{}) {
-	if l.Level < ERROR {
+	if l.level < ERROR {
 		return
 	}
 
-	l.manager.C <- l.createMessage(l.FileDepth, ERROR, v...)
-}
-
-//create another logger that will add a prefix
-func (l *Logger) WithPrefix(prefix string) *Logger{
-	return &Logger{
-		Level:        l.Level,
-		Verbosity:    l.Verbosity,
-		GoLogLevel:   l.GoLogLevel,
-		Prefix: prefix,
-		HeaderWriter: l.HeaderWriter,
-		FooterWriter: l.FooterWriter,
-		FileDepth: l.FileDepth,
-
-		manager: l.manager,
-	}
-}
-
-//set the depth of the file/line log (this is if you want to create wrapper over it)
-func (l *Logger) SetFileDepth(depth int) {
-	l.FileDepth = depth
+	l.manager.C <- l.createMessage(l.fileDepth, ERROR, v...)
 }
 
 func (l *Logger) Write(p []byte) (n int, err error) {
-	if l.Level < l.GoLogLevel {
+	if l.level < l.goLogLevel {
 		return
 	}
 
-	l.manager.C <- l.createMessage(l.FileDepth + 2, l.GoLogLevel, string(p[0:len(p)-1]))
+	l.manager.C <- l.createMessage(l.fileDepth+2, l.goLogLevel, string(p[0:len(p)-1]))
 
 	return len(p), nil
 }
@@ -223,17 +229,15 @@ func (l *Logger) createMessage(calldepth int, level LogLevel, v ...interface{}) 
 	msg.date = time.Now()
 	msg.message = v
 	msg.level = level
-	msg.vebosity = l.Verbosity
-	msg.prefix = &l.Prefix
 
-	if l.Verbosity&LFile != 0 {
+	if l.verbosity&LFile != 0 {
 		_, file, line, ok := runtime.Caller(calldepth)
 		if !ok {
 			file = "???"
 			line = 0
 		}
 
-		if l.Verbosity&LFileLong == 0 {
+		if l.verbosity&LFileLong == 0 {
 			short := file
 			for i := len(file) - 1; i > 0; i-- {
 				if file[i] == '/' {
@@ -251,10 +255,8 @@ func (l *Logger) createMessage(calldepth int, level LogLevel, v ...interface{}) 
 }
 
 type message struct {
-	prefix *string
 	date         time.Time
 	level        LogLevel
-	vebosity     LogVerbosity
 	message      []interface{}
 	callLocation string
 }
