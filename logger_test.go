@@ -6,8 +6,11 @@ import (
 )
 
 func TestLogger(t *testing.T) {
-	l := NewLogger("test1", "test1", 1000, 0)
-	l.Verbosity = LDefault | LFile | LMicroseconds | LFileLong
+	l := NewLogger("test1", "test1", &LoggerConfig{
+		Level:     DEBUG,
+		Verbosity: LDefault | LHeaderFooter | LFile,
+	})
+
 	l.Info("log line test")
 
 	lgo := l.GetGoLogger()
