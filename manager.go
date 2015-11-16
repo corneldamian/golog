@@ -13,6 +13,7 @@ const tempStderrWriteSize = 500 * 1024
 func newManager(fileName string, config *LoggerConfig) *logmanager {
 	manage := &logmanager{
 		C:              make(chan *message, config.MessageQueueSize),
+		closser:        make(chan bool),
 		fileName:       fileName,
 		fileRotateSize: config.FileRotateSize,
 		config:         config,
@@ -24,7 +25,8 @@ func newManager(fileName string, config *LoggerConfig) *logmanager {
 }
 
 type logmanager struct {
-	C chan *message
+	C       chan *message
+	closser chan bool
 
 	config          *LoggerConfig
 	fileName        string
@@ -37,14 +39,27 @@ func (l *logmanager) start() {
 	go func() {
 		l.newFile()
 
-		var buf []byte
-		for m := range l.C {
-			buf = buf[:0]
-			l.formatHeader(&buf, m)
-			l.write(&buf)
-		}
+		defer l.closeFile()
 
-		l.closeFile()
+		var buf []byte
+
+		for {
+			select {
+			case m, ok := <-l.C:
+				if !ok {
+					return
+				}
+				buf = buf[:0]
+				l.formatHeader(&buf, m)
+				l.write(&buf)
+
+			case _, ok := <-l.closser:
+				if !ok {
+					l.closser = nil
+					close(l.C)
+				}
+			}
+		}
 	}()
 }
 

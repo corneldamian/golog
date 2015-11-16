@@ -6,8 +6,8 @@ import (
 	"log"
 	"runtime"
 	"strconv"
-	"time"
 	"strings"
+	"time"
 )
 
 type LogLevel int
@@ -104,7 +104,7 @@ func Stop(timeout time.Duration) error {
 	timeoutTime := time.NewTimer(timeout)
 
 	for _, logger := range registeredLoggers {
-		close(logger.manager.C)
+		close(logger.manager.closser)
 	}
 
 	for {
@@ -233,7 +233,7 @@ func (l *Logger) Debugf(fmt string, v ...interface{}) {
 	v = append(v, v[0])
 	v[0] = fmt
 
-	l.manager.C <- l.createMessage(l.fileDepth + 1, DEBUG, v...)
+	l.manager.C <- l.createMessage(l.fileDepth+1, DEBUG, v...)
 }
 
 func (l *Logger) Infof(fmt string, v ...interface{}) {
@@ -244,7 +244,7 @@ func (l *Logger) Infof(fmt string, v ...interface{}) {
 	v = append(v, v[0])
 	v[0] = fmt
 
-	l.manager.C <- l.createMessage(l.fileDepth + 1, INFO, v...)
+	l.manager.C <- l.createMessage(l.fileDepth+1, INFO, v...)
 }
 
 func (l *Logger) Warningf(fmt string, v ...interface{}) {
@@ -255,7 +255,7 @@ func (l *Logger) Warningf(fmt string, v ...interface{}) {
 	v = append(v, v[0])
 	v[0] = fmt
 
-	l.manager.C <- l.createMessage(l.fileDepth + 1, WARNING, v...)
+	l.manager.C <- l.createMessage(l.fileDepth+1, WARNING, v...)
 }
 
 func (l *Logger) Errorf(fmt string, v ...interface{}) {
@@ -266,9 +266,8 @@ func (l *Logger) Errorf(fmt string, v ...interface{}) {
 	v = append(v, v[0])
 	v[0] = fmt
 
-	l.manager.C <- l.createMessage(l.fileDepth + 1, ERROR, v...)
+	l.manager.C <- l.createMessage(l.fileDepth+1, ERROR, v...)
 }
-
 
 func (l *Logger) Write(p []byte) (n int, err error) {
 	if l.level < l.goLogLevel {
@@ -279,7 +278,6 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 
 	return len(p), nil
 }
-
 
 func (l *Logger) GetGoLogger() *log.Logger {
 	if l.gologger == nil {
