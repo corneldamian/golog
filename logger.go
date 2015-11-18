@@ -103,10 +103,6 @@ func Stop(timeout time.Duration) error {
 	checkClients := time.Tick(100 * time.Millisecond)
 	timeoutTime := time.NewTimer(timeout)
 
-	for _, logger := range registeredLoggers {
-		close(logger.manager.closser)
-	}
-
 	for {
 		select {
 		case <-checkClients:
