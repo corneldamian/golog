@@ -171,6 +171,10 @@ func NewLogger(loggerName, fileName string, config *LoggerConfig) *Logger {
 		}
 	}
 
+	if config.MessageQueueSize == 0 {
+		config.MessageQueueSize = 50000
+	}
+
 	l := &Logger{
 		level:      config.Level,
 		verbosity:  config.Verbosity,

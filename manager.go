@@ -45,10 +45,7 @@ func (l *logmanager) start() {
 
 		for {
 			select {
-			case m, ok := <-l.C:
-				if !ok {
-					return
-				}
+			case m, _ := <-l.C:
 				buf = buf[:0]
 				l.formatHeader(&buf, m)
 				l.write(&buf)
@@ -56,7 +53,6 @@ func (l *logmanager) start() {
 			case _, ok := <-l.closser:
 				if !ok {
 					l.closser = nil
-					close(l.C)
 				}
 			}
 		}
