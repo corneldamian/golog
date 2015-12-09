@@ -24,7 +24,7 @@ func newManager(fileName string, config *LoggerConfig) *logmanager {
 }
 
 type logmanager struct {
-	C       chan *message
+	C chan *message
 
 	config          *LoggerConfig
 	fileName        string

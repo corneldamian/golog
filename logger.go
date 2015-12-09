@@ -45,7 +45,7 @@ func (ll LogLevel) String() string {
 
 //string to LogLevel (if unknown will return INFO)
 func ToLogLevel(loglevel string) LogLevel {
-	loglevel = strings.ToLower(loglevel)
+	loglevel = strings.ToUpper(loglevel)
 
 	switch loglevel {
 	case lerror:
