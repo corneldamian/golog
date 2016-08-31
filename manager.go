@@ -12,10 +12,11 @@ const tempStderrWriteSize = 500 * 1024
 
 func newManager(fileName string, config *LoggerConfig) *logmanager {
 	manage := &logmanager{
-		C:              make(chan *message, config.MessageQueueSize),
-		fileName:       fileName,
-		fileRotateSize: config.FileRotateSize,
-		config:         config,
+		C:                make(chan *message, config.MessageQueueSize),
+		fileName:         fileName,
+		fileRotateSize:   config.FileRotateSize,
+		fileRotatePeriod: config.FileRotatePeriod,
+		config:           config,
 	}
 
 	manage.start()
@@ -26,11 +27,13 @@ func newManager(fileName string, config *LoggerConfig) *logmanager {
 type logmanager struct {
 	C chan *message
 
-	config          *LoggerConfig
-	fileName        string
-	fileRotateSize  int
-	currentFileSize int
-	currentFile     io.Writer
+	config                *LoggerConfig
+	fileName              string
+	fileRotateSize        int
+	fileRotatePeriod      int
+	currentFileSize       int
+	currentFileCreateTime time.Time
+	currentFile           io.Writer
 }
 
 func (l *logmanager) start() {
@@ -121,7 +124,11 @@ func (l *logmanager) write(p *[]byte) (n int, err error) {
 }
 
 func (l *logmanager) shouldRotate() bool {
-	if l.currentFileSize >= l.fileRotateSize {
+	if l.fileRotateSize > 0 && l.currentFileSize >= l.fileRotateSize {
+		return true
+	}
+
+	if l.fileRotatePeriod > 0 && time.Since(l.currentFileCreateTime) > time.Duration(l.fileRotatePeriod)*time.Hour {
 		return true
 	}
 
@@ -143,6 +150,7 @@ func (l *logmanager) closeFile() {
 func (l *logmanager) newFile() {
 	file := l.fileName + ".log"
 	l.currentFileSize = 0
+	l.currentFileCreateTime = time.Now()
 
 	if l.currentFile != os.Stderr {
 		if err := l.rename(file); err != nil {

@@ -129,6 +129,7 @@ func Stop(timeout time.Duration) error {
 
 type LoggerConfig struct {
 	FileRotateSize   int // default 16MB
+	FileRotatePeriod int // in hours, default 0
 	MessageQueueSize int
 	Level            LogLevel
 	Verbosity        LogVerbosity
@@ -148,6 +149,7 @@ func NewLogger(loggerName, fileName string, config *LoggerConfig) *Logger {
 	if config == nil {
 		config = &LoggerConfig{
 			FileRotateSize:   (2 << 23), /*16MB*/
+			FileRotatePeriod: 0,
 			MessageQueueSize: 50000,
 			Level:            INFO,
 			Verbosity:        LDefault,
@@ -169,6 +171,10 @@ func NewLogger(loggerName, fileName string, config *LoggerConfig) *Logger {
 
 	if config.MessageQueueSize == 0 {
 		config.MessageQueueSize = 50000
+	}
+
+	if config.FileRotatePeriod < 0 {
+		config.FileRotatePeriod = 0
 	}
 
 	l := &Logger{
@@ -225,13 +231,13 @@ func (l *Logger) Error(v ...interface{}) {
 	l.manager.C <- l.createMessage(l.fileDepth, ERROR, v...)
 }
 
-func (l *Logger) Debugf(fmt string, v ...interface{}) {
+func (l *Logger) Debugf(fmt interface{}, v ...interface{}) {
 	if l.level < DEBUG {
 		return
 	}
 
-	v = append(v, v[0])
-	v[0] = fmt
+	rest := []interface{}{fmt}
+	v = append(rest, v...)
 
 	l.manager.C <- l.createMessage(l.fileDepth+1, DEBUG, v...)
 }
@@ -241,8 +247,8 @@ func (l *Logger) Infof(fmt string, v ...interface{}) {
 		return
 	}
 
-	v = append(v, v[0])
-	v[0] = fmt
+	rest := []interface{}{fmt}
+	v = append(rest, v...)
 
 	l.manager.C <- l.createMessage(l.fileDepth+1, INFO, v...)
 }
@@ -252,8 +258,8 @@ func (l *Logger) Warningf(fmt string, v ...interface{}) {
 		return
 	}
 
-	v = append(v, v[0])
-	v[0] = fmt
+	rest := []interface{}{fmt}
+	v = append(rest, v...)
 
 	l.manager.C <- l.createMessage(l.fileDepth+1, WARNING, v...)
 }
@@ -263,8 +269,8 @@ func (l *Logger) Errorf(fmt string, v ...interface{}) {
 		return
 	}
 
-	v = append(v, v[0])
-	v[0] = fmt
+	rest := []interface{}{fmt}
+	v = append(rest, v...)
 
 	l.manager.C <- l.createMessage(l.fileDepth+1, ERROR, v...)
 }
