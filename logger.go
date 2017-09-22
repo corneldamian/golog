@@ -190,6 +190,11 @@ func NewLogger(loggerName, fileName string, config *LoggerConfig) *Logger {
 	return l
 }
 
+func (l *Logger) QueueIsFull() bool {
+	return len(l.manager.C) == cap(l.manager.C)
+}
+
+
 //get an existing logger
 func GetLogger(loggerName string) *Logger {
 	if logger, found := registeredLoggers[loggerName]; found {
